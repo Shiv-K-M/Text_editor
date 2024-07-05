@@ -18,6 +18,8 @@
 
 #define CTRL_KEY(k) ((k) & 0x1f)
 #define KILO_VERSION "0.0.1"
+#define KILO_TAB_STOP 8
+
 enum editorKey {
   ARROW_LEFT = 1000,
   ARROW_RIGHT,
@@ -41,6 +43,7 @@ typedef struct erow {
 
 struct editorConfig {
   int cx, cy;
+  int rx;
   int rowoff;
   int coloff;
   int screenrows;
@@ -190,6 +193,17 @@ int getWindowSize(int *rows, int *cols) {
 
 /*** row  operations ***/
 
+int editorRowCxToRx(erow *row, int cx) {
+  int rx = 0;
+  int j;
+  for (j = 0; j < cx; j++) {
+    if (row->chars[j] == '\t')
+      rx += (KILO_TAB_STOP - 1) - (rx % KILO_TAB_STOP);
+    rx++;
+  }
+  return rx;
+}
+
 void editorUpdateRow(erow *row) {
   int tabs = 0;
   int j;
@@ -198,13 +212,13 @@ void editorUpdateRow(erow *row) {
       tabs++;
 
   free(row->render);
-  row->render = malloc(row->size + tabs * 7 + 1);
+  row->render = malloc(row->size + tabs * (KILO_TAB_STOP - 1) + 1);
 
   int idx = 0;
   for (j = 0; j < row->size; j++) {
     if (row->chars[j] == '\t') {
       row->render[idx++] = ' ';
-      while (idx % 8 != 0)
+      while (idx % KILO_TAB_STOP != 0)
         row->render[idx++] = ' ';
     } else {
       row->render[idx++] = row->chars[j];
@@ -273,17 +287,19 @@ void abFree(struct abuf *ab) { free(ab->b); }
 /*** output ***/
 
 void editorScroll() {
-  if (E.cy < E.rowoff) {
-    E.rowoff = E.cy;
+  E.rx = 0;
+
+  if (E.cy < E.numrows) {
+    E.rx = editorRowCxToRx(&E.row[E.cy], E.cx);
   }
   if (E.cy >= E.rowoff + E.screenrows) {
     E.rowoff = E.screenrows + 1;
   }
-  if (E.cx < E.coloff) {
-    E.coloff = E.cx;
+  if (E.rx < E.coloff) {
+    E.coloff = E.rx;
   }
-  if (E.cx >= E.coloff + E.screencols) {
-    E.coloff = E.cx - E.screencols + 1;
+  if (E.rx >= E.coloff + E.screencols) {
+    E.coloff = E.rx - E.screencols + 1;
   }
 }
 void editorDrawRows(struct abuf *ab) {
@@ -335,7 +351,7 @@ void editorRefreshScreen() {
 
   char buf[32];
   snprintf(buf, sizeof(buf), "\x1b[%d;%dH", (E.cy - E.rowoff) + 1,
-           (E.cx - E.coloff) + 1);
+           (E.rx - E.coloff) + 1);
   abAppend(&ab, buf, strlen(buf));
 
   abAppend(&ab, "\x1b[?25h", 6);
@@ -422,6 +438,7 @@ void editorProcessKeypress() {
 void initEditor() {
   E.cx = 0;
   E.cy = 0;
+  E.rx = 0;
   E.rowoff = 0;
   E.coloff = 0;
   E.numrows = 0;
