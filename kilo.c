@@ -34,7 +34,9 @@ enum editorKey {
 /*** data ***/
 typedef struct erow {
   int size;
+  int rsize;
   char *chars;
+  char *render;
 } erow;
 
 struct editorConfig {
@@ -197,6 +199,11 @@ void editorAppendRow(char *s, size_t len) {
   memcpy(E.row[at].chars, s, len);
   E.row[at].chars[len] = '\0';
   E.numrows++;
+
+  E.row[at].rsize = 0;
+  E.row[at].render = NULL;
+
+  E.numrows++;
 }
 /*** file i/o ***/
 
@@ -329,6 +336,9 @@ void editorMoveCursor(int key) {
   case ARROW_RIGHT:
     if (row && E.cx < row->size) {
       E.cx++;
+    } else if (row && E.cx < row->size) {
+      E.cy++;
+      E.cx = 0;
     }
     break;
   case ARROW_UP:
