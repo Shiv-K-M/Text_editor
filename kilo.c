@@ -337,6 +337,16 @@ void editorDrawRows(struct abuf *ab) {
   }
 }
 
+void editorDrawSratusBar(struct abuf *ab) {
+  abAppend(ab, "\x1b[7m", 4);
+  int len = 0;
+  while (len < E.screencols) {
+    abAppend(ab, " ", 1);
+    len++;
+  }
+  abAppend(ab, "\x1b[m", 3);
+}
+
 void editorRefreshScreen() {
   editorScroll();
 
