@@ -68,7 +68,7 @@ struct editorConfig E;
 
 void editorSetStatusMessage(const char *fmt, ...);
 void editorRefreshScreen();
-char *editorPrompt(char *prompt);
+char *editorPrompt(char *prompt, void (*callback)(char *, int));
 
 /*** terminal ***/
 
@@ -411,9 +411,9 @@ void editorOpen(char *filename) {
 
 void editorSave() {
   if (E.filename == NULL) {
-    E.filename = editorPrompt("Save as : %s (ESC to cancel)");
+    E.filename = editorPrompt("Save as : %s (ESC to cancel)", NULL);
     if (E.filename == NULL) {
-      E.filename = editorPrompt("save as : %s");
+      editorSetStatusMessage("save aborted");
       return;
     }
   }
@@ -440,15 +440,16 @@ void editorSave() {
 }
 
 /*** find ***/
-void editorFind() {
-  char *query = editorPrompt("Search : %s (ESC to cancel)");
+void editorFindCallback(char *query, int key) {
+  if (key == '\r' || key == '\x1b')
+    return;
+
   int i;
   for (i = 0; i < E.numrows; i++) {
     erow *row = &E.row[i];
     char *match = strstr(row->render, query);
     if (match) {
       E.cy = i;
-      E.cx = match - row->render;
       E.cx = editorRowRxToCx(row, match - row->render);
       E.rowoff = E.numrows;
       break;
@@ -457,6 +458,12 @@ void editorFind() {
   free(query);
 }
 
+void editorFind() {
+  char *query = editorPrompt("search : %s (ESC to cancel)", editorFindCallback);
+  if (query) {
+    free(query);
+  }
+}
 /*** append buffer ***/
 
 struct abuf {
@@ -602,7 +609,7 @@ void editorSetStatusMessage(const char *fmt, ...) {
 
 /*** input ***/
 
-char *editorPrompt(char *prompt) {
+char *editorPrompt(char *prompt, void (*callback)(char *, int)) {
   size_t bufsize = 128;
   char *buf = malloc(bufsize);
   size_t buflen = 0;
@@ -617,19 +624,27 @@ char *editorPrompt(char *prompt) {
         buf[--buflen] = '\0';
     } else if (c == '\x1b') {
       editorSetStatusMessage("");
+      if (callback)
+        callback(buf, c);
       free(buf);
       return NULL;
     } else if (c == '\r') {
       if (buflen != 0) {
         editorSetStatusMessage("");
+        if (callback)
+          callback(buf, c);
         return buf;
       }
     } else if (!iscntrl(c) && c < 128) {
-      bufsize *= 2;
-      buf = realloc(buf, bufsize);
+      if (buflen == bufsize - 1) {
+        bufsize *= 2;
+        buf = realloc(buf, bufsize);
+      }
+      buf[buflen++] = c;
+      buf[buflen] = '\0';
     }
-    buf[buflen++] = c;
-    buf[buflen] = '\0';
+    if (callback)
+      callback(buf, c);
   }
 }
 
