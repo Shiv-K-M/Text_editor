@@ -21,7 +21,8 @@
 
 #define KILO_VERSION "0.0.1"
 #define KILO_TAB_STOP 8
-#define KILO_QUIT_TIMES 2
+#define KILO_QUIT_TIMES 3
+
 #define CTRL_KEY(k) ((k) & 0x1f)
 
 enum editorKey {
@@ -212,7 +213,7 @@ int getWindowSize(int *rows, int *cols) {
   }
 }
 
-/*** syntax highkighting ***/
+/*** syntax highlighting ***/
 
 void editorUpdateSyntax(erow *row) {
   row->hl = realloc(row->hl, row->rsize);
@@ -337,20 +338,20 @@ void editorRowInsertChar(erow *row, int at, int c) {
   E.dirty++;
 }
 
-void editorRowDelChar(erow *row, int at) {
-  if (at < 0 || at >= row->size)
-    return;
-  memmove(&row->chars[at], &row->chars[at + 1], row->size - at);
-  row->size--;
-  editorUpdateRow(row);
-  E.dirty++;
-}
-
 void editorRowAppendString(erow *row, char *s, size_t len) {
   row->chars = realloc(row->chars, row->size + len + 1);
   memcpy(&row->chars[row->size], s, len);
   row->size += len;
   row->chars[row->size] = '\0';
+  editorUpdateRow(row);
+  E.dirty++;
+}
+
+void editorRowDelChar(erow *row, int at) {
+  if (at < 0 || at >= row->size)
+    return;
+  memmove(&row->chars[at], &row->chars[at + 1], row->size - at);
+  row->size--;
   editorUpdateRow(row);
   E.dirty++;
 }
@@ -385,8 +386,8 @@ void editorDelChar() {
     return;
   if (E.cx == 0 && E.cy == 0)
     return;
-  erow *row = &E.row[E.cy];
 
+  erow *row = &E.row[E.cy];
   if (E.cx > 0) {
     editorRowDelChar(row, E.cx - 1);
     E.cx--;
@@ -443,9 +444,9 @@ void editorOpen(char *filename) {
 
 void editorSave() {
   if (E.filename == NULL) {
-    E.filename = editorPrompt("Save as : %s (ESC to cancel)", NULL);
+    E.filename = editorPrompt("Save as: %s (ESC to cancel)", NULL);
     if (E.filename == NULL) {
-      editorSetStatusMessage("save aborted");
+      editorSetStatusMessage("Save aborted");
       return;
     }
   }
@@ -472,6 +473,7 @@ void editorSave() {
 }
 
 /*** find ***/
+
 void editorFindCallback(char *query, int key) {
   static int last_match = -1;
   static int direction = 1;
@@ -521,7 +523,7 @@ void editorFind() {
   int saved_rowoff = E.rowoff;
 
   char *query =
-      editorPrompt("search : %s (use ESC/Arrow/Enter)", editorFindCallback);
+      editorPrompt("Search: %s (Use ESC/Arrows/Enter)", editorFindCallback);
 
   if (query) {
     free(query);
@@ -532,6 +534,7 @@ void editorFind() {
     E.rowoff = saved_rowoff;
   }
 }
+
 /*** append buffer ***/
 
 struct abuf {
@@ -626,7 +629,7 @@ void editorDrawRows(struct abuf *ab) {
           abAppend(ab, &c[j], 1);
         }
       }
-      abAppend(ab, "\x1b[K", 5);
+      abAppend(ab, "\x1b[39m", 5);
     }
 
     abAppend(ab, "\x1b[K", 3);
@@ -637,7 +640,7 @@ void editorDrawRows(struct abuf *ab) {
 void editorDrawStatusBar(struct abuf *ab) {
   abAppend(ab, "\x1b[7m", 4);
   char status[80], rstatus[80];
-  int len = snprintf(status, sizeof(status), "%.20s - %d lines",
+  int len = snprintf(status, sizeof(status), "%.20s - %d lines %s",
                      E.filename ? E.filename : "[No Name]", E.numrows,
                      E.dirty ? "(modified)" : "");
   int rlen = snprintf(rstatus, sizeof(rstatus), "%d/%d", E.cy + 1, E.numrows);
@@ -702,8 +705,10 @@ void editorSetStatusMessage(const char *fmt, ...) {
 char *editorPrompt(char *prompt, void (*callback)(char *, int)) {
   size_t bufsize = 128;
   char *buf = malloc(bufsize);
+
   size_t buflen = 0;
   buf[0] = '\0';
+
   while (1) {
     editorSetStatusMessage(prompt, buf);
     editorRefreshScreen();
@@ -733,6 +738,7 @@ char *editorPrompt(char *prompt, void (*callback)(char *, int)) {
       buf[buflen++] = c;
       buf[buflen] = '\0';
     }
+
     if (callback)
       callback(buf, c);
   }
@@ -855,6 +861,7 @@ void editorProcessKeypress() {
     editorInsertChar(c);
     break;
   }
+
   quit_times = KILO_QUIT_TIMES;
 }
 
