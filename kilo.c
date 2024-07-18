@@ -292,6 +292,12 @@ void editorSelectSyntaxHighlight() {
         int patlen = strlen(s->filematch[i]);
         if (s->filematch[i][0] != '.' || p[patlen] == '\0') {
           E.syntax = s;
+
+          int filerow;
+          for (filerow = 0; filerow < E.numrows; filerow++) {
+            editorUpdateSyntax(&E.row[filerow]);
+          }
+
           return;
         }
       }
@@ -486,6 +492,8 @@ void editorOpen(char *filename) {
   free(E.filename);
   E.filename = strdup(filename);
 
+  editorSelectSyntaxHighlight();
+
   FILE *fp = fopen(filename, "r");
   if (!fp)
     die("fopen");
@@ -511,6 +519,7 @@ void editorSave() {
       editorSetStatusMessage("Save aborted");
       return;
     }
+    editorSelectSyntaxHighlight();
   }
 
   int len;
